@@ -10,9 +10,9 @@ grails.project.dependency.resolution = {
     log "warn"
 
     repositories {
-        grailsHome()
         grailsCentral()
         mavenCentral()
+        mavenRepo 'http://repo.grails.org/grails/plugins-releases-local'
     }
 
     dependencies {
@@ -22,7 +22,7 @@ grails.project.dependency.resolution = {
     }
 
     plugins {
-        build ':release:3.0.1', ':rest-client-builder:2.0.1', {
+        build ':release:2.2.1', ':rest-client-builder:2.0.1', {
             export = false
         }
     }
