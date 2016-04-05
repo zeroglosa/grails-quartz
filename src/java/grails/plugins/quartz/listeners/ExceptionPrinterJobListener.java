@@ -16,20 +16,20 @@
 
 package grails.plugins.quartz.listeners;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.quartz.listeners.JobListenerSupport;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * Logs exceptions occurring during job's execution.
+ * JobListener implementation which logs an exceptions occurred during job's execution.
  *
  * @author Sergey Nebolsin (nebolsin@gmail.com)
  * @since 0.2
  */
 public class ExceptionPrinterJobListener extends JobListenerSupport {
-    protected final Logger log = LoggerFactory.getLogger(getClass());
+    private static final transient Log LOG = LogFactory.getLog(ExceptionPrinterJobListener.class);
 
     public static final String NAME = "exceptionPrinterListener";
 
@@ -37,10 +37,8 @@ public class ExceptionPrinterJobListener extends JobListenerSupport {
         return NAME;
     }
 
-    @Override
     public void jobWasExecuted(JobExecutionContext context, JobExecutionException exception) {
-        if (exception != null) {
-            log.error("Exception occurred in job: " + context.getJobDetail().getDescription(), exception);
-        }
+        if (exception != null)
+            LOG.error("Exception occurred in job: " + context.getJobDetail().getDescription(), exception);
     }
 }

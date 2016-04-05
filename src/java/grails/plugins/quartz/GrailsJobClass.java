@@ -21,7 +21,7 @@ import org.codehaus.groovy.grails.commons.InjectableGrailsClass;
 import java.util.Map;
 
 /**
- * Represents a job class.
+ * Represents a job class in Grails.
  *
  * @author Micha?? K??ujszo
  * @author Graeme Rocher
@@ -32,51 +32,79 @@ import java.util.Map;
 public interface GrailsJobClass extends InjectableGrailsClass {
 
     /**
-     * Executed by the job scheduler.
+     * Method which is executed by the job scheduler.
      */
-    void execute();
+    public void execute();
 
     /**
-     * Group name used for configuring scheduler.
+     * Get job timeout between executions.
+     *
+     * @return timeout between job executions (repeat interval) in milliseconds
+     */
+    public long getTimeout();
+
+    /**
+     * Get start delay before first execution after starting scheduler.
+     *
+     * @return delay between job's registering and first execution in milliseconds
+     */
+    public long getStartDelay();
+
+    /**
+     * Get the number of times the job should repeat, after which it will be automatically deleted
+     *
+     * @return maximum job's executions count
+     */
+    public int getRepeatCount();
+
+    /**
+     * Get cron expression used for configuring scheduler.
+     *
+     * @return cron expression configured for this job
+     */
+    public String getCronExpression();
+
+    /**
+     * Get group name used for configuring scheduler.
      *
      * @return jobs group name for this job
      */
-    String getGroup();
+    public String getGroup();
 
     /**
-     * Determine if jobs can be executed concurrently.
+     * If cronExpression property is set returns true.
      *
-     * @return true if multiple instances of this job can run concurrently
+     * @return true, if cron expression is configured for this job, false overwise
      */
-    boolean isConcurrent();
+    public boolean isCronExpressionConfigured();
 
     /**
-     * Determine if job requires Hibernate Session bound to thread.
+     * If jobs can be executed concurrently returns true.
      *
-     * @return true if this job requires a Hibernate Session bound to thread
+     * @return true if several instances of this job can run concurrently
      */
-    boolean isSessionRequired();
+    public boolean isConcurrent();
 
     /**
-     * Determine if job is durable.
+     * If job requires Hibernate Session bounded to thread returns true.
+     *
+     * @return true if this job require a Hibernate Session bounded to thread
+     */
+    public boolean isSessionRequired();
+
+    /**
+     * If job is durable returns true.
      *
      * @return true if this job is durable
      */
-    boolean isDurability();
+    public boolean getDurability();
 
     /**
-     * Determine if job should be re-executed if a 'recovery' or 'fail-over' situation is encountered.
+     * If job should be re-executed if a 'recovery' or 'fail-over' situation is encountered returns true.
      *
      * @return true if this job requests recovery
      */
-    boolean isRequestsRecovery();
+    public boolean getRequestsRecovery();
 
-    /**
-     * Job's description for configuring job details.
-     *
-     * @return description
-     */
-    String getDescription();
-
-    Map<String, Object> getTriggers();
+    public Map getTriggers();
 }

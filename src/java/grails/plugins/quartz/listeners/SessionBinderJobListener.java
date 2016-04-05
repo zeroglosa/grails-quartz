@@ -20,19 +20,15 @@ import org.codehaus.groovy.grails.support.PersistenceContextInterceptor;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.quartz.listeners.JobListenerSupport;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * Wraps the execution of a Quartz Job in a persistence context, via the
- * persistenceInterceptor.
+ * JobListener implementation which wraps the execution of a Quartz Job in a
+ * persistence context, via the persistenceInterceptor.
  *
  * @author Sergey Nebolsin (nebolsin@gmail.com)
  * @since 0.2
  */
 public class SessionBinderJobListener extends JobListenerSupport {
-
-    protected final Logger log = LoggerFactory.getLogger(getClass());
 
     public static final String NAME = "sessionBinderListener";
 
@@ -46,47 +42,20 @@ public class SessionBinderJobListener extends JobListenerSupport {
         return persistenceInterceptor;
     }
 
-    public void setPersistenceInterceptor(PersistenceContextInterceptor interceptor) {
-        persistenceInterceptor = interceptor;
+    public void setPersistenceInterceptor(PersistenceContextInterceptor persistenceInterceptor) {
+        this.persistenceInterceptor = persistenceInterceptor;
     }
 
-    /**
-     * Before job executing. Init persistence context.
-     */
-    @Override
     public void jobToBeExecuted(JobExecutionContext context) {
-        if (persistenceInterceptor == null) {
-            return;
+        if (persistenceInterceptor != null) {
+            persistenceInterceptor.init();
         }
-
-        persistenceInterceptor.init();
-        log.debug("Persistence session is opened.");
     }
 
-    /**
-     * After job executing. Flush and destroy persistence context.
-     */
-    @Override
     public void jobWasExecuted(JobExecutionContext context, JobExecutionException exception) {
-        if (persistenceInterceptor == null) {
-            return;
-        }
-
-        try {
+        if (persistenceInterceptor != null) {
             persistenceInterceptor.flush();
-            persistenceInterceptor.clear();
-            log.debug("Persistence session is flushed.");
-        }
-        catch (Exception e) {
-            log.error("Failed to flush session after job: " + context.getJobDetail().getDescription(), e);
-        }
-        finally {
-            try {
-                persistenceInterceptor.destroy();
-            }
-            catch (Exception e) {
-                log.error("Failed to finalize session after job: " + context.getJobDetail().getDescription(), e);
-            }
+            persistenceInterceptor.destroy();
         }
     }
 }

@@ -16,31 +16,21 @@
 
 package grails.plugins.quartz;
 
-import static grails.plugins.quartz.GrailsJobClassConstants.CONCURRENT;
-import static grails.plugins.quartz.GrailsJobClassConstants.DEFAULT_CONCURRENT;
-import static grails.plugins.quartz.GrailsJobClassConstants.DEFAULT_DESCRIPTION;
-import static grails.plugins.quartz.GrailsJobClassConstants.DEFAULT_DURABILITY;
-import static grails.plugins.quartz.GrailsJobClassConstants.DEFAULT_GROUP;
-import static grails.plugins.quartz.GrailsJobClassConstants.DEFAULT_REQUESTS_RECOVERY;
-import static grails.plugins.quartz.GrailsJobClassConstants.DEFAULT_SESSION_REQUIRED;
-import static grails.plugins.quartz.GrailsJobClassConstants.DESCRIPTION;
-import static grails.plugins.quartz.GrailsJobClassConstants.DURABILITY;
-import static grails.plugins.quartz.GrailsJobClassConstants.EXECUTE;
-import static grails.plugins.quartz.GrailsJobClassConstants.GROUP;
-import static grails.plugins.quartz.GrailsJobClassConstants.REQUESTS_RECOVERY;
-import static grails.plugins.quartz.GrailsJobClassConstants.SESSION_REQUIRED;
 import grails.plugins.quartz.config.TriggersConfigBuilder;
+import grails.util.GrailsUtil;
 import groovy.lang.Closure;
-
-import java.util.HashMap;
-import java.util.Map;
-
 import org.codehaus.groovy.grails.commons.AbstractInjectableGrailsClass;
 import org.codehaus.groovy.grails.commons.GrailsClassUtils;
 import org.quartz.JobExecutionContext;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import static grails.plugins.quartz.GrailsJobClassConstants.*;
+
+
 /**
- * Represents a Quartz job.
+ * Grails artefact class which represents a Quartz job.
  *
  * @author Micha?? K??ujszo
  * @author Marcel Overdijk
@@ -50,65 +40,120 @@ import org.quartz.JobExecutionContext;
 public class DefaultGrailsJobClass extends AbstractInjectableGrailsClass implements GrailsJobClass {
 
     public static final String JOB = "Job";
+    private Map triggers = new HashMap();
 
-    private static final Object[] NO_ARGS = {};
 
-    private Map<String, Object> triggers = new HashMap<String, Object>();
-
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    public DefaultGrailsJobClass(Class<?> clazz) {
+    public DefaultGrailsJobClass(Class clazz) {
         super(clazz, JOB);
+        evaluateTriggers();
+    }
 
+    private void evaluateTriggers() {
         // registering additional triggersClosure from 'triggersClosure' closure if present
         Closure triggersClosure = (Closure) GrailsClassUtils.getStaticPropertyValue(getClazz(), "triggers");
+
+        TriggersConfigBuilder builder = new TriggersConfigBuilder(getFullName());
+
         if (triggersClosure != null) {
-            triggers = new TriggersConfigBuilder(getFullName()).build(triggersClosure);
+            builder.build(triggersClosure);
+            triggers = (Map) builder.getTriggers();
+        } else {
+            // backward compatibility
+            if (isCronExpressionConfigured()) {
+                GrailsUtil.deprecated("You're using deprecated 'def cronExpression = ...' parameter in the " + getFullName() + ", use 'static triggers = { cron cronExpression: ...} instead.");
+                triggers = builder.createEmbeddedCronTrigger(getStartDelay(), getCronExpression());
+            } else {
+                GrailsUtil.deprecated("You're using deprecated 'def startDelay = ...; def timeout = ...' parameters in the" + getFullName() + ", use 'static triggers = { simple startDelay: ..., repeatInterval: ...} instead.");
+                triggers = builder.createEmbeddedSimpleTrigger(getStartDelay(), getTimeout(), getRepeatCount());
+            }
         }
     }
 
     public void execute() {
-        getMetaClass().invokeMethod(getReferenceInstance(), EXECUTE, NO_ARGS);
+        getMetaClass().invokeMethod(getReferenceInstance(), EXECUTE, new Object[]{});
     }
 
     public void execute(JobExecutionContext context) {
         getMetaClass().invokeMethod(getReferenceInstance(), EXECUTE, new Object[]{context});
     }
 
-    public String getGroup() {
-        return getStringValue(GROUP, DEFAULT_GROUP);
+    // TODO: ============== start of deprecated methods =================
+    public long getTimeout() {
+        Object obj = getPropertyValue(TIMEOUT);
+        if (obj == null) return DEFAULT_TIMEOUT;
+        else if (!(obj instanceof Number)) {
+            throw new IllegalArgumentException(
+                    "timeout trigger property in the job class " +
+                            getShortName() + " must be Integer or Long");
+        }
+
+        return ((Number) obj).longValue();
     }
 
+    public long getStartDelay() {
+        Object obj = getPropertyValue(START_DELAY);
+        if (obj == null) return DEFAULT_START_DELAY;
+        else if (!(obj instanceof Number)) {
+            throw new IllegalArgumentException(
+                    "startDelay trigger property in the job class " +
+                            getShortName() + " must be Integer or Long");
+        }
+
+        return ((Number) obj).longValue();
+    }
+
+    public int getRepeatCount() {
+        Object obj = getPropertyValue(REPEAT_COUNT);
+        if (obj == null) return DEFAULT_REPEAT_COUNT;
+        else if (!(obj instanceof Number)) {
+            throw new IllegalArgumentException(
+                    "repeatCount trigger property in the job class " +
+                            getShortName() + " must be Integer or Long");
+        }
+
+        return ((Number) obj).intValue();
+    }
+
+    public String getCronExpression() {
+        String cronExpression = (String) getPropertyOrStaticPropertyOrFieldValue(CRON_EXPRESSION, String.class);
+        if (cronExpression == null || "".equals(cronExpression)) return DEFAULT_CRON_EXPRESSION;
+        return cronExpression;
+    }
+
+    public String getGroup() {
+        String group = (String) getPropertyOrStaticPropertyOrFieldValue(GROUP, String.class);
+        if (group == null || "".equals(group)) return DEFAULT_GROUP;
+        return group;
+    }
+
+    // not certain about this... feels messy
+    public boolean isCronExpressionConfigured() {
+        String cronExpression = (String) getPropertyOrStaticPropertyOrFieldValue(CRON_EXPRESSION, String.class);
+        return cronExpression != null;
+    }
+    // TODO: ============== end of deprecated methods =================
+
     public boolean isConcurrent() {
-        return getBooleanValue(CONCURRENT, DEFAULT_CONCURRENT);
+        Boolean concurrent = (Boolean) getPropertyValue(CONCURRENT, Boolean.class);
+        return concurrent == null ? DEFAULT_CONCURRENT : concurrent;
     }
 
     public boolean isSessionRequired() {
-        return getBooleanValue(SESSION_REQUIRED, DEFAULT_SESSION_REQUIRED);
+        Boolean sessionRequired = (Boolean) getPropertyValue(SESSION_REQUIRED, Boolean.class);
+        return sessionRequired == null ? DEFAULT_SESSION_REQUIRED : sessionRequired;
     }
 
-    public boolean isDurability() {
-        return getBooleanValue(DURABILITY, DEFAULT_DURABILITY);
+    public boolean getDurability() {
+        Boolean durability = (Boolean) getPropertyValue(DURABILITY, Boolean.class);
+        return durability == null ? DEFAULT_DURABILITY : durability;
     }
 
-    public boolean isRequestsRecovery() {
-        return getBooleanValue(REQUESTS_RECOVERY, DEFAULT_REQUESTS_RECOVERY);
+    public boolean getRequestsRecovery() {
+        Boolean requestsRecovery = (Boolean) getPropertyValue(REQUESTS_RECOVERY, Boolean.class);
+        return requestsRecovery == null ? DEFAULT_REQUESTS_RECOVERY : requestsRecovery;
     }
 
-    public String getDescription() {
-        return getStringValue(DESCRIPTION, DEFAULT_DESCRIPTION);
-    }
-
-    public Map<String, Object> getTriggers() {
+    public Map getTriggers() {
         return triggers;
     }
-
-    protected String getStringValue(String propName, String defaultIfMissing) {
-        String value = getPropertyOrStaticPropertyOrFieldValue(propName, String.class);
-        return (value == null || "".equals(value)) ? defaultIfMissing : value;
-    }
-
-    protected boolean getBooleanValue(String propName, boolean defaultIfMissing) {
-        Boolean value = getPropertyValue(propName, Boolean.class);
-        return value == null ? defaultIfMissing : value;
-   }
 }

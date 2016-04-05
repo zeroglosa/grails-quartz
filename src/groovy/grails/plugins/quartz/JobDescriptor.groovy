@@ -21,7 +21,7 @@ import org.quartz.Scheduler
 import org.quartz.Trigger
 
 /**
- * Stores information about the Quartz job to show on webapp.
+ * JobDescriptor that stores information about the Quartz job to show on webapp.
  *
  * @author Marco Mornati (mmornati@byte-code.com)
  * @author Sergey Nebolsin (nebolsin@gmail.com)
@@ -29,21 +29,23 @@ import org.quartz.Trigger
  * @since 0.4
  */
 class JobDescriptor {
-
     JobDetail jobDetail
+
     List<TriggerDescriptor> triggerDescriptors
 
-    static JobDescriptor build(JobDetail jobDetail, Scheduler scheduler) {
+    static build(JobDetail jobDetail, Scheduler scheduler) {
         def job = new JobDescriptor(jobDetail: jobDetail)
-        job.triggerDescriptors = scheduler.getTriggersOfJob(jobDetail.key).collect { TriggerDescriptor.build(job, it, scheduler) }
+        job.triggerDescriptors = scheduler.getTriggersOfJob(job.name, job.group).collect { Trigger trigger ->
+            TriggerDescriptor.build(job, trigger, scheduler)
+        }
         job
     }
 
     String getName() {
-        jobDetail.key.name
+        jobDetail.name
     }
 
     String getGroup() {
-        jobDetail.key.group
+        jobDetail.group
     }
 }

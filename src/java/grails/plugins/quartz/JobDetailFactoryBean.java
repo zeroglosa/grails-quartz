@@ -16,13 +16,24 @@
 
 package grails.plugins.quartz;
 
-import static org.quartz.JobBuilder.newJob;
-
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.codehaus.groovy.grails.commons.ApplicationHolder;
+import org.codehaus.groovy.grails.web.context.ServletContextHolder;
+import org.codehaus.groovy.grails.web.servlet.GrailsApplicationAttributes;
 import org.quartz.JobDetail;
+import org.quartz.ListenerManager;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.impl.JobDetailImpl;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Required;
-import org.springframework.util.Assert;
+import org.springframework.context.ApplicationContext;
+import org.springframework.scheduling.quartz.SchedulerFactoryBean;
+
+import static org.quartz.JobBuilder.*;
+import static org.quartz.impl.matchers.EverythingMatcher.allJobs;
 
 /**
  * Simplified version of Spring's <a href='http://static.springframework.org/spring/docs/2.5.x/api/org/springframework/scheduling/quartz/MethodInvokingJobDetailFactoryBean.html'>MethodInvokingJobDetailFactoryBean</a>
@@ -32,47 +43,140 @@ import org.springframework.util.Assert;
  * @author Sergey Nebolsin (nebolsin@gmail.com)
  * @since 0.3.2
  */
-public class JobDetailFactoryBean implements FactoryBean<JobDetail>, InitializingBean {
+public class JobDetailFactoryBean implements FactoryBean, InitializingBean {
     public static final transient String JOB_NAME_PARAMETER = "org.grails.plugins.quartz.grailsJobName";
 
-    private GrailsJobClass jobClass;
+    private String name;
+    private String group;
+    private boolean concurrent;
+    private boolean durability;
+    private boolean requestsRecovery;
+    private String[] jobListenerNames;
     private JobDetail jobDetail;
+    private static Log log = LogFactory.getLog(JobDetailFactoryBean.class);
+
+    /**
+     * Set the name of the job.
+     * <p>Default is the bean name of this FactoryBean.
+     *
+     * @param name name of the job
+     * @see org.quartz.JobDetail#setName
+     */
+    public void setName(final String name) {
+        this.name = name;
+    }
+
+    /**
+     * Set the group of the job.
+     * <p>Default is the default group of the Scheduler.
+     *
+     * @param group group name of the job
+     * @see org.quartz.JobDetail#setGroup
+     * @see org.quartz.Scheduler#DEFAULT_GROUP
+     */
+    public void setGroup(final String group) {
+        this.group = group;
+    }
+
+    /**
+     * Set a list of JobListener names for this job, referring to
+     * JobListeners registered with the Scheduler.
+     * <p>A JobListener name always refers to the name returned
+     * by the JobListener implementation.
+     *
+     * @param names array of job listener names which should be applied to the job
+     * @see SchedulerFactoryBean#setJobListeners
+     * @see org.quartz.JobListener#getName
+     */
+    public void setJobListenerNames(final String[] names) {
+        this.jobListenerNames = names;
+    }
 
     @Required
-    public void setJobClass(GrailsJobClass jobClass) {
-        this.jobClass = jobClass;
+    public void setConcurrent(final boolean concurrent) {
+        this.concurrent = concurrent;
     }
 
-    public void afterPropertiesSet() {
-        String name = jobClass.getFullName();
-        Assert.state(name != null, "name is required");
+    @Required
+    public void setDurability(boolean durability) {
+        this.durability = durability;
+    }
 
-        String group = jobClass.getGroup();
-        Assert.state(group != null, "group is required");
+    @Required
+    public void setRequestsRecovery(boolean requestsRecovery) {
+        this.requestsRecovery = requestsRecovery;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @see InitializingBean#afterPropertiesSet()
+     */
+    public void afterPropertiesSet() {
+
+        if (name == null) {
+            throw new IllegalStateException("name is required");
+        }
+
+        if (group == null) {
+            throw new IllegalStateException("group is required");
+        }
 
         // Consider the concurrent flag to choose between stateful and stateless job.
-        Class<? extends GrailsJobFactory.GrailsJob> clazz =
-                jobClass.isConcurrent() ? GrailsJobFactory.GrailsJob.class : GrailsJobFactory.StatefulGrailsJob.class;
+        Class jobClass = (concurrent ? GrailsJobFactory.GrailsJob.class : GrailsJobFactory.StatefulGrailsJob.class);
 
         // Build JobDetail instance.
-        jobDetail =
-                newJob(clazz)
+        jobDetail = newJob(jobClass)
                 .withIdentity(name, group)
-                .storeDurably(jobClass.isDurability())
-                .requestRecovery(jobClass.isRequestsRecovery())
+                .storeDurably(durability)
+                .requestRecovery(requestsRecovery)
                 .usingJobData(JOB_NAME_PARAMETER, name)
-                .withDescription(jobClass.getDescription())
                 .build();
+
+
+        // Register job listener names.
+        if (jobListenerNames != null) {
+            ApplicationContext ctx =
+                    (ApplicationContext) ApplicationHolder.getApplication().getMainContext();
+            Scheduler quartzScheduler = (Scheduler) ctx.getBean("quartzScheduler");
+            try {
+                ListenerManager manager = quartzScheduler.getListenerManager();
+                for (String jobListenerName : jobListenerNames) {
+
+                    // no matcher == match all jobs
+
+                    manager.addJobListener(manager.getJobListener(jobListenerName), allJobs());
+
+                }
+            } catch (SchedulerException e) {
+                log.error("Error adding job listener to scheduler:", e);
+            }
+        }
     }
 
-    public JobDetail getObject() {
+    /**
+     * {@inheritDoc}
+     *
+     * @see FactoryBean#getObject()
+     */
+    public Object getObject() {
         return jobDetail;
     }
 
-    public Class<JobDetail> getObjectType() {
+    /**
+     * {@inheritDoc}
+     *
+     * @see FactoryBean#getObjectType()
+     */
+    public Class getObjectType() {
         return JobDetail.class;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @see FactoryBean#isSingleton()
+     */
     public boolean isSingleton() {
         return true;
     }

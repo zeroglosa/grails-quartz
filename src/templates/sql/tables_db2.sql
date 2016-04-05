@@ -115,7 +115,6 @@ create table qrtz_fired_triggers(
   trigger_group varchar(80) not null,
   instance_name varchar(80) not null,
   fired_time bigint not null,
-  sched_time bigint not null,
   priority integer not null,
   state varchar(16) not null,
   job_name varchar(80) null,

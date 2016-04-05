@@ -19,7 +19,7 @@ package grails.plugins.quartz;
 import org.quartz.SimpleTrigger;
 
 /**
- * <p>Plugin constants.</p>
+ * <p>Holds plugin constants.</p>
  *
  * @author Micha?? K??ujszo
  * @author Graeme Rocher
@@ -45,8 +45,6 @@ public final class GrailsJobClassConstants {
 
     public static final String GROUP = "group";
 
-    public static final String DESCRIPTION = "description";
-
     public static final String CONCURRENT = "concurrent";
 
     public static final String SESSION_REQUIRED = "sessionRequired";
@@ -64,17 +62,18 @@ public final class GrailsJobClassConstants {
 
     // Default values for Job's properties
 
-    public static final long DEFAULT_REPEAT_INTERVAL = 60000;    // one minute
+    public static final long DEFAULT_REPEAT_INTERVAL = 60000l;    // one minute
 
-    public static final long DEFAULT_START_DELAY = 0;  // no delay by default
+    // TODO: deprecated, remove in the next release
+    public static final long DEFAULT_TIMEOUT = DEFAULT_REPEAT_INTERVAL;    // one minute
+
+    public static final long DEFAULT_START_DELAY = 0l;  // no delay by default
 
     public static final int DEFAULT_REPEAT_COUNT = SimpleTrigger.REPEAT_INDEFINITELY;
 
     public static final String DEFAULT_CRON_EXPRESSION = "0 0 6 * * ?";
 
     public static final String DEFAULT_GROUP = "GRAILS_JOBS";
-
-    public static final String DEFAULT_DESCRIPTION = "Grails Job";
 
     public static final boolean DEFAULT_CONCURRENT = true;
 
