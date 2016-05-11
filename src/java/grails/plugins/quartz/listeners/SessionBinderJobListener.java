@@ -16,6 +16,8 @@
 
 package grails.plugins.quartz.listeners;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.codehaus.groovy.grails.support.PersistenceContextInterceptor;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -29,7 +31,7 @@ import org.quartz.listeners.JobListenerSupport;
  * @since 0.2
  */
 public class SessionBinderJobListener extends JobListenerSupport {
-
+    private static final transient Log LOG = LogFactory.getLog(SessionBinderJobListener.class);
     public static final String NAME = "sessionBinderListener";
 
     private PersistenceContextInterceptor persistenceInterceptor;
@@ -54,8 +56,21 @@ public class SessionBinderJobListener extends JobListenerSupport {
 
     public void jobWasExecuted(JobExecutionContext context, JobExecutionException exception) {
         if (persistenceInterceptor != null) {
-            persistenceInterceptor.flush();
-            persistenceInterceptor.destroy();
+            try {
+                persistenceInterceptor.flush();
+                persistenceInterceptor.clear();
+                LOG.debug("Persistence session is flushed.");
+            } catch (Exception e) {
+                LOG.error("Failed to flush session after job: " + context.getJobDetail().getDescription(), e);
+            } finally {
+                try {
+                    //Both calls are necessary to workaround GORM bug, when we have two, or more, dataSources
+                    persistenceInterceptor.destroy();
+                    persistenceInterceptor.destroy();
+                } catch (Exception e) {
+                    LOG.error("Failed to finalize session after job: " + context.getJobDetail().getDescription(), e);
+                }
+            }
         }
     }
 }
